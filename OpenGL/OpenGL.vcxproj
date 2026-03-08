@@ -144,7 +144,7 @@
     <ClCompile Include="Model.cpp" />
     <ClCompile Include="OpenGL.cpp" />
     <ClCompile Include="Shader.cpp" />
-    <ClCompile Include="Sphere.cpp" />
+    <ClCompile Include="Primitives.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="GameObject.h" />
@@ -159,7 +159,7 @@
     <ClInclude Include="imstb_truetype.h" />
     <ClInclude Include="Model.h" />
     <ClInclude Include="Shader.h" />
-    <ClInclude Include="Sphere.h" />
+    <ClInclude Include="Primitives.h" />
     <ClInclude Include="stb_image.h" />
   </ItemGroup>
   <ItemGroup>

@@ -14,7 +14,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include "Shader.h"
-#include "Sphere.h"
+#include "Primitives.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
@@ -145,12 +145,14 @@ int main(int, char**)
         return -1;
     }
     glEnable(GL_DEPTH_TEST);
+    glEnable(GL_STENCIL_TEST);
 
     Shader ourShader("shaders/shader.vs", "shaders/shader.fs");
 	ourShader.use();
 
-    Model* cube = new Sphere(2.0f, 16, 32);
+    Model* cube = new Cube(1.0f);
     Model* mesh = new Sphere(1.0f, 64, 32);
+	Model* plane = new Plane(50.0f);
 
     unsigned int texture;
     glGenTextures(1, &texture);
@@ -164,7 +166,7 @@ int main(int, char**)
 
     // Загрузка и генерация текстуры
     int width, height, nrChannels;
-    unsigned char* data = stbi_load("textures/grunge-wall-texture.jpg", &width, &height, &nrChannels, 0);
+    unsigned char* data = stbi_load("textures/wood.jpg", &width, &height, &nrChannels, 0);
     if (data)
     {
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
@@ -175,6 +177,12 @@ int main(int, char**)
         std::cout << "Failed to load texture" << std::endl;
     }
     stbi_image_free(data);
+
+    //FBO
+
+
+
+    //////////////
 
     glm::mat4 model = glm::mat4(1.0f);
     glm::mat4 view = glm::mat4(1.0f);
@@ -221,6 +229,7 @@ int main(int, char**)
 
     // Our state
     bool show_demo_window = false;
+    bool polygonMode = false;
     bool show_another_window = false;
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
     ImVec4 translate = ImVec4(0.0f, 0.0f, -3.0f, 1.00f);
@@ -265,6 +274,7 @@ int main(int, char**)
 
             ImGui::Text("Toggle Ctrl to free/lock cursor");               // Display some text (you can use a format strings too)
             ImGui::Checkbox("Demo Window", &show_demo_window);      // Edit bools storing our window open/close state
+            ImGui::Checkbox("PolygonMode", &polygonMode);      // Edit bools storing our window open/close state
 
             ImGui::ColorEdit3("clear color", (float*)&clear_color); // Edit 3 floats representing a color
             ImGui::DragFloat3("position", (float*)&translate, 0.001f);
@@ -277,12 +287,19 @@ int main(int, char**)
             ImGui::End();
         }
 
+        if (polygonMode) {
+            glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+        }
+        else {
+            glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+        }
+
         ImGui::Render();
         int display_w, display_h;
         glfwGetFramebufferSize(window, &display_w, &display_h);
         glViewport(0, 0, display_w, display_h);
         glClearColor(clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
 		model = glm::mat4(1.0f);
 		view = glm::mat4(1.0f);
@@ -290,9 +307,6 @@ int main(int, char**)
 
 		model = glm::translate(model, glm::vec3(translate.x, translate.y, translate.z));
         model = glm::rotate(model, glm::radians(degress), glm::vec3(rotate.x, rotate.y, rotate.z));
-        const float radius = 10.0f;
-        float camX = sin(glfwGetTime()) * radius;
-        float camZ = cos(glfwGetTime()) * radius;
         view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
         projection = glm::perspective(glm::radians(45.0f), (float)display_w / display_h, 0.1f, 100.0f);
 
@@ -309,15 +323,24 @@ int main(int, char**)
         int lightPosLoc = glGetUniformLocation(ourShader.ID, "lightPos");
         glUniform3f(lightPosLoc, lightPos.x, lightPos.y, lightPos.z);
 
+        int camPosLoc = glGetUniformLocation(ourShader.ID, "viewPos");
+        glUniform3f(camPosLoc, cameraPos.x, cameraPos.y, cameraPos.z);
+
         glActiveTexture(GL_TEXTURE0); // сначала активируем текстурный юнит, прежде чем связывать текстуру
         glBindTexture(GL_TEXTURE_2D, texture);
 
 		mesh->draw();
 
-        model = glm::translate(model, glm::vec3(10, 10, 10));
+        model = glm::translate(model, glm::vec3(1, 1, 1));
         glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
 
         cube->draw();
+
+		model = glm::mat4(1.0f);
+        model = glm::translate(model, glm::vec3(0, 0, 0));
+        glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
+
+        plane->draw();
 
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
