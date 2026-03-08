@@ -6,13 +6,6 @@
 #include <sstream>
 #include <iostream>
 
-#include <glad/glad.h> // подключаем glad для активации всех заголовочных файлов OpenGL
-
-#include <string>
-#include <fstream>
-#include <sstream>
-#include <iostream>
-
 class Shader
 {
 public:
