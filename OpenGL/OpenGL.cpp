@@ -150,6 +150,7 @@ int main(int, char**)
 
     Shader ourShader("shaders/shader.vs", "shaders/shader.fs");
     Shader screenShader("shaders/framebufferShader.vs", "shaders/framebufferShader.fs");
+	Shader skyShader("shaders/sky.vs", "shaders/sky.fs");
 
     Model* cube = new Cube(1.0f);
     Model* mesh = new Sphere(1.0f, 64, 32);
@@ -233,6 +234,35 @@ int main(int, char**)
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
     //////////////
 
+	///SKY QUAD
+
+    float skyQuadVertices[] = {
+    -1.0f, -1.0f,
+     1.0f, -1.0f,
+     1.0f,  1.0f,
+
+    -1.0f, -1.0f,
+     1.0f,  1.0f,
+    -1.0f,  1.0f
+    };
+
+    unsigned int skyVAO, skyVBO;
+
+    glGenVertexArrays(1, &skyVAO);
+    glGenBuffers(1, &skyVBO);
+
+    glBindVertexArray(skyVAO);
+
+    glBindBuffer(GL_ARRAY_BUFFER, skyVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(skyQuadVertices), skyQuadVertices, GL_STATIC_DRAW);
+
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+
+    glBindVertexArray(0);
+
+    ///////////
+
     glm::mat4 model = glm::mat4(1.0f);
     glm::mat4 view = glm::mat4(1.0f);
     glm::mat4 projection;
@@ -243,10 +273,7 @@ int main(int, char**)
     ImGuiIO& io = ImGui::GetIO(); (void)io;
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
-
-    // Setup Dear ImGui style
     ImGui::StyleColorsDark();
-    //ImGui::StyleColorsLight();
 
     // Setup scaling
     ImGuiStyle& style = ImGui::GetStyle();
@@ -257,25 +284,6 @@ int main(int, char**)
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init(glsl_version);
 
-    // Load Fonts
-    // - If fonts are not explicitly loaded, Dear ImGui will select an embedded font: either AddFontDefaultVector() or AddFontDefaultBitmap().
-    //   This selection is based on (style.FontSizeBase * style.FontScaleMain * style.FontScaleDpi) reaching a small threshold.
-    // - You can load multiple fonts and use ImGui::PushFont()/PopFont() to select them.
-    // - If a file cannot be loaded, AddFont functions will return a nullptr. Please handle those errors in your code (e.g. use an assertion, display an error and quit).
-    // - Read 'docs/FONTS.md' for more instructions and details.
-    // - Use '#define IMGUI_ENABLE_FREETYPE' in your imconfig file to use FreeType for higher quality font rendering.
-    // - Remember that in C/C++ if you want to include a backslash \ in a string literal you need to write a double backslash \\ !
-    // - Our Emscripten build process allows embedding fonts to be accessible at runtime from the "fonts/" folder. See Makefile.emscripten for details.
-    //style.FontSizeBase = 20.0f;
-    //io.Fonts->AddFontDefaultVector();
-    //io.Fonts->AddFontDefaultBitmap();
-    //io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\segoeui.ttf");
-    //io.Fonts->AddFontFromFileTTF("../../misc/fonts/DroidSans.ttf");
-    //io.Fonts->AddFontFromFileTTF("../../misc/fonts/Roboto-Medium.ttf");
-    //io.Fonts->AddFontFromFileTTF("../../misc/fonts/Cousine-Regular.ttf");
-    //ImFont* font = io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\ArialUni.ttf");
-    //IM_ASSERT(font != nullptr);
-
     // Our state
     bool show_demo_window = false;
     bool polygonMode = false;
@@ -285,23 +293,17 @@ int main(int, char**)
     ImVec4 rotate = ImVec4(1.0f, 1.0f, 0.0f, 1.00f);
     ImVec4 cubeColor = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
     ImVec4 lightPos = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
+    ImVec4 sunDir = ImVec4(-0.5f, 0.2f, 0.8f, 1.0f);
 	float degress = 45.0f;
 
     while (!glfwWindowShouldClose(window))
     {
-        // Poll and handle events (inputs, window resize, etc.)
-        // You can read the io.WantCaptureMouse, io.WantCaptureKeyboard flags to tell if dear imgui wants to use your inputs.
-        // - When io.WantCaptureMouse is true, do not dispatch mouse input data to your main application, or clear/overwrite your copy of the mouse data.
-        // - When io.WantCaptureKeyboard is true, do not dispatch keyboard input data to your main application, or clear/overwrite your copy of the keyboard data.
-        // Generally you may always pass all inputs to dear imgui, and hide them from your application based on those two flags.
         glfwPollEvents();
         if (glfwGetWindowAttrib(window, GLFW_ICONIFIED) != 0)
         {
             ImGui_ImplGlfw_Sleep(10);
             continue;
         }
-        glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
-        glEnable(GL_DEPTH_TEST); // включение режима теста глубины 
 
         float currentFrame = glfwGetTime();
         deltaTime = currentFrame - lastFrame;
@@ -333,11 +335,18 @@ int main(int, char**)
 			ImGui::DragFloat("degrees", &degress, 1.0f, 0.0f, 360.0f);
             ImGui::ColorEdit3("Cube color", (float*)&cubeColor);
             ImGui::DragFloat3("Light pos", (float*)&lightPos, 0.01f);
+            ImGui::DragFloat3("Sun dir", (float*)&sunDir, 0.01f);
 
             ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
             ImGui::End();
         }
 
+        ImGui::Render();
+        int display_w, display_h;
+        glfwGetFramebufferSize(window, &display_w, &display_h);
+
+        glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+        glEnable(GL_DEPTH_TEST); // включение режима теста глубины 
         if (polygonMode) {
             glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
         }
@@ -345,15 +354,30 @@ int main(int, char**)
             glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
         }
 
-        ImGui::Render();
-        int display_w, display_h;
-        glfwGetFramebufferSize(window, &display_w, &display_h);
-
 		ourShader.use();
 
         glViewport(0, 0, display_w, display_h);
         glClearColor(clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        //SKY RENDER
+        glDisable(GL_DEPTH_TEST);
+        skyShader.use();
+
+        glm::vec3 cameraRight = glm::normalize(glm::cross(cameraUp, cameraFront));
+        skyShader.setVec3("sunDir", sunDir.x, sunDir.y, sunDir.z);
+        skyShader.setVec3("cameraPos", cameraPos);
+        skyShader.setVec3("cameraDir", cameraFront);
+        skyShader.setVec3("cameraRight", cameraRight);
+        skyShader.setVec3("cameraUp", cameraUp);
+        skyShader.setFloat("iTime", glfwGetTime());
+        skyShader.setFloat("fov", 45);
+        skyShader.setFloat("aspect", (float)g_width / g_height);
+        glBindVertexArray(skyVAO);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+        glEnable(GL_DEPTH_TEST);
+
+		ourShader.use();
 
 		model = glm::mat4(1.0f);
 		view = glm::mat4(1.0f);
@@ -397,9 +421,8 @@ int main(int, char**)
         plane->draw();
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        glDisable(GL_DEPTH_TEST); // отключаем режим теста глубины. Теперь экранный прямоугольник не будет отсекаться в результате прохождения данного теста
-        // Очищаем все сопутствующие буферы
-        glClearColor(1.0f, 1.0f, 1.0f, 1.0f); // устанавливаем цвет заливки на "белый" (установите прозрачный цвет на белый (на самом деле это не обязательно, так как мы все равно не сможем видеть пространство за прямоугольником))
+        glDisable(GL_DEPTH_TEST);
+        //glClearColor(1.0f, 1.0f, 1.0f, 1.0f); // устанавливаем цвет заливки на "белый" (установите прозрачный цвет на белый (на самом деле это не обязательно, так как мы все равно не сможем видеть пространство за прямоугольником))
         glClear(GL_COLOR_BUFFER_BIT);
         screenShader.use();
         glBindVertexArray(quadVAO);
