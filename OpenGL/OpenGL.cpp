@@ -117,7 +117,7 @@ void processInput(GLFWwindow* window)
         cameraPos += glm::normalize(glm::cross(cameraFront, cameraUp)) * cameraSpeed;
 }
 
-int g_width = 1920, g_height = 1080;
+int g_width = 3800, g_height = 2000;
 
 int main(int, char**)
 {
@@ -151,6 +151,7 @@ int main(int, char**)
     Shader ourShader("shaders/shader.vs", "shaders/shader.fs");
     Shader screenShader("shaders/framebufferShader.vs", "shaders/framebufferShader.fs");
 	Shader skyShader("shaders/sky.vs", "shaders/sky.fs");
+	Shader shadowShader("shaders/shadowShader.vs", "shaders/shadowShader.fs");
 
     Model* cube = new Cube(1.0f);
     Model* mesh = new Sphere(1.0f, 64, 32);
@@ -263,6 +264,31 @@ int main(int, char**)
 
     ///////////
 
+    //DEPTH Shadow
+
+    unsigned int depthMapFBO;
+    glGenFramebuffers(1, &depthMapFBO);
+    const unsigned int SHADOW_WIDTH = 1024, SHADOW_HEIGHT = 1024;
+
+    unsigned int depthMap;
+    glGenTextures(1, &depthMap);
+    glBindTexture(GL_TEXTURE_2D, depthMap);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, SHADOW_WIDTH, SHADOW_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthMap, 0);
+    glDrawBuffer(GL_NONE);
+    glReadBuffer(GL_NONE);
+    GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+    if (status != GL_FRAMEBUFFER_COMPLETE) {
+        std::cout << "ERROR::DEPTH_FBO_INCOMPLETE: " << std::hex << status << std::dec << std::endl;
+    }
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
     glm::mat4 model = glm::mat4(1.0f);
     glm::mat4 view = glm::mat4(1.0f);
     glm::mat4 projection;
@@ -295,6 +321,8 @@ int main(int, char**)
     ImVec4 lightPos = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
     ImVec4 sunDir = ImVec4(-0.5f, 0.2f, 0.8f, 1.0f);
 	float degress = 45.0f;
+
+    glActiveTexture(GL_TEXTURE0); // сначала активируем текстурный юнит, прежде чем связывать текстуру
 
     while (!glfwWindowShouldClose(window))
     {
@@ -345,6 +373,43 @@ int main(int, char**)
         int display_w, display_h;
         glfwGetFramebufferSize(window, &display_w, &display_h);
 
+		shadowShader.use();
+
+        float near_plane = 1.0f, far_plane = 7.5f;
+        glm::mat4 lightProjection = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, near_plane, far_plane);
+        glm::mat4 lightView = glm::lookAt(glm::vec3(-5.0f, 4.0f, -5.0f),
+            glm::vec3(0.0f, 0.0f, 0.0f),
+            glm::vec3(0.0f, 1.0f, 0.0f));
+        glm::mat4 lightSpaceMatrix = lightProjection * lightView;
+
+		shadowShader.setMat4("lightSpaceMatrix", lightSpaceMatrix);
+        {
+            glEnable(GL_DEPTH_TEST); // включение режима теста глубины 
+            glViewport(0, 0, SHADOW_WIDTH, SHADOW_HEIGHT);
+            glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
+            glClear(GL_DEPTH_BUFFER_BIT);
+
+			glm::mat4 model = glm::mat4(1.0f);
+            model = glm::translate(model, glm::vec3(translate.x, translate.y, translate.z));
+            model = glm::rotate(model, glm::radians(degress), glm::vec3(rotate.x, rotate.y, rotate.z));
+
+			shadowShader.setMat4("model", model);
+            mesh->draw();
+
+            model = glm::translate(model, glm::vec3(1, 2, 1));
+            shadowShader.setMat4("model", model);
+
+            cube->draw();
+
+            model = glm::mat4(1.0f);
+            model = glm::translate(model, glm::vec3(0, 0, 0));
+            shadowShader.setMat4("model", model);
+
+            plane->draw();
+        }
+
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
         glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
         glEnable(GL_DEPTH_TEST); // включение режима теста глубины 
         if (polygonMode) {
@@ -361,21 +426,21 @@ int main(int, char**)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         //SKY RENDER
-        glDisable(GL_DEPTH_TEST);
-        skyShader.use();
-
-        glm::vec3 cameraRight = glm::normalize(glm::cross(cameraUp, cameraFront));
-        skyShader.setVec3("sunDir", sunDir.x, sunDir.y, sunDir.z);
-        skyShader.setVec3("cameraPos", cameraPos);
-        skyShader.setVec3("cameraDir", cameraFront);
-        skyShader.setVec3("cameraRight", cameraRight);
-        skyShader.setVec3("cameraUp", cameraUp);
-        skyShader.setFloat("iTime", glfwGetTime());
-        skyShader.setFloat("fov", 45);
-        skyShader.setFloat("aspect", (float)g_width / g_height);
-        glBindVertexArray(skyVAO);
-        glDrawArrays(GL_TRIANGLES, 0, 6);
-        glEnable(GL_DEPTH_TEST);
+        //glDisable(GL_DEPTH_TEST);
+        //skyShader.use();
+        //
+        //glm::vec3 cameraRight = glm::normalize(glm::cross(cameraUp, cameraFront));
+        //skyShader.setVec3("sunDir", sunDir.x, sunDir.y, sunDir.z);
+        //skyShader.setVec3("cameraPos", cameraPos);
+        //skyShader.setVec3("cameraDir", cameraFront);
+        //skyShader.setVec3("cameraRight", cameraRight);
+        //skyShader.setVec3("cameraUp", cameraUp);
+        //skyShader.setFloat("iTime", glfwGetTime());
+        //skyShader.setFloat("fov", 45);
+        //skyShader.setFloat("aspect", (float)g_width / g_height);
+        //glBindVertexArray(skyVAO);
+        //glDrawArrays(GL_TRIANGLES, 0, 6);
+        //glEnable(GL_DEPTH_TEST);
 
 		ourShader.use();
 
@@ -388,44 +453,37 @@ int main(int, char**)
         view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
         projection = glm::perspective(glm::radians(45.0f), (float)display_w / display_h, 0.1f, 100.0f);
 
-        int modelLoc = glGetUniformLocation(ourShader.ID, "model");
-        glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
-        int viewLoc = glGetUniformLocation(ourShader.ID, "view");
-        glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
-        int projectionLoc = glGetUniformLocation(ourShader.ID, "projection");
-        glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, glm::value_ptr(projection));
+        ourShader.setMat4("projection", projection);
+        ourShader.setMat4("view", view);
+        ourShader.setMat4("model", model);
 
-        int lightColor = glGetUniformLocation(ourShader.ID, "lightColor");
-        glUniform3f(lightColor, cubeColor.x, cubeColor.y, cubeColor.z);
+        ourShader.setVec3("lightColor", cubeColor.x, cubeColor.y, cubeColor.z);
+        ourShader.setVec3("lightPos", lightPos.x, lightPos.y, lightPos.z);
+        ourShader.setVec3("viewPos", cameraPos.x, cameraPos.y, cameraPos.z);
 
-        int lightPosLoc = glGetUniformLocation(ourShader.ID, "lightPos");
-        glUniform3f(lightPosLoc, lightPos.x, lightPos.y, lightPos.z);
-
-        int camPosLoc = glGetUniformLocation(ourShader.ID, "viewPos");
-        glUniform3f(camPosLoc, cameraPos.x, cameraPos.y, cameraPos.z);
-
-        glActiveTexture(GL_TEXTURE0); // сначала активируем текстурный юнит, прежде чем связывать текстуру
         glBindTexture(GL_TEXTURE_2D, texture);
 
 		mesh->draw();
 
         model = glm::translate(model, glm::vec3(1, 1, 1));
-        glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
+        ourShader.setMat4("model", model);
 
         cube->draw();
 
 		model = glm::mat4(1.0f);
         model = glm::translate(model, glm::vec3(0, 0, 0));
-        glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
+        ourShader.setMat4("model", model);
 
         plane->draw();
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
         glDisable(GL_DEPTH_TEST);
-        //glClearColor(1.0f, 1.0f, 1.0f, 1.0f); // устанавливаем цвет заливки на "белый" (установите прозрачный цвет на белый (на самом деле это не обязательно, так как мы все равно не сможем видеть пространство за прямоугольником))
+        glClearColor(1.0f, 1.0f, 1.0f, 1.0f); // устанавливаем цвет заливки на "белый" (установите прозрачный цвет на белый (на самом деле это не обязательно, так как мы все равно не сможем видеть пространство за прямоугольником))
         glClear(GL_COLOR_BUFFER_BIT);
         screenShader.use();
         glBindVertexArray(quadVAO);
+        glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, textureColorbuffer); // используем прикрепленную цветовую текстуру в качестве текстуры для прямоугольника
         glDrawArrays(GL_TRIANGLES, 0, 6);
 

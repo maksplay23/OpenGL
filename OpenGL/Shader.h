@@ -107,6 +107,10 @@ public:
     {
         glUniform3f(glGetUniformLocation(ID, name.c_str()), value.x, value.y, value.z);
 	}
+    void setMat4(const std::string& name, const glm::mat4& mat) const
+    {
+        glUniformMatrix4fv(glGetUniformLocation(ID, name.c_str()), 1, GL_FALSE, glm::value_ptr(mat));
+	}
 
 private:
     // Полезные функции для проверки ошибок компиляции/связывания шейдеров

@@ -107,5 +107,7 @@
     <None Include="shaders\shader.vs" />
     <None Include="shaders\framebufferShader.fs" />
     <None Include="shaders\framebufferShader.vs" />
+    <None Include="shaders\shadowShader.fs" />
+    <None Include="shaders\shadowShader.vs" />
   </ItemGroup>
 </Project>

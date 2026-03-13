@@ -167,6 +167,8 @@
     <None Include="shaders\framebufferShader.vs" />
     <None Include="shaders\shader.fs" />
     <None Include="shaders\shader.vs" />
+    <None Include="shaders\shadowShader.fs" />
+    <None Include="shaders\shadowShader.vs" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
