@@ -9,6 +9,7 @@ out vec3 ourColor;
 out vec3 Normal;
 out vec2 TexCoord;
 out vec3 FragPos;
+
 out vec4 FragPosLightSpace;
 
 uniform mat4 model;

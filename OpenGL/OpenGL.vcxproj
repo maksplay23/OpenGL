@@ -165,10 +165,16 @@
   <ItemGroup>
     <None Include="shaders\framebufferShader.fs" />
     <None Include="shaders\framebufferShader.vs" />
+    <None Include="shaders\lightShader.fs" />
+    <None Include="shaders\lightShader.vs" />
+    <None Include="shaders\myShader.fs" />
+    <None Include="shaders\myShader.vs" />
     <None Include="shaders\shader.fs" />
     <None Include="shaders\shader.vs" />
     <None Include="shaders\shadowShader.fs" />
     <None Include="shaders\shadowShader.vs" />
+    <None Include="shaders\sky.fs" />
+    <None Include="shaders\sky.vs" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
